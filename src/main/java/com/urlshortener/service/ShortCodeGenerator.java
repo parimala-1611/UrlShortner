@@ -1,12 +1,14 @@
 package com.urlshortener.service;
 
 import com.urlshortener.util.Base62Encoder;
+import org.springframework.stereotype.Component;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+@Component
 public class ShortCodeGenerator {
 
     public static final int CODE_LENGTH = 8;

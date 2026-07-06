@@ -1,7 +1,10 @@
 package com.urlshortener.util;
 
+import org.springframework.stereotype.Component;
+
 import java.math.BigInteger;
 
+@Component
 public class Base62Encoder {
 
     private static final String ALPHABET =

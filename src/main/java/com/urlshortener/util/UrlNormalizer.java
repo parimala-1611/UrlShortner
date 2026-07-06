@@ -1,10 +1,13 @@
 package com.urlshortener.util;
 
+import org.springframework.stereotype.Component;
+
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+@Component
 public class UrlNormalizer {
 
     private static final Pattern HAS_SCHEME = Pattern.compile("(?i)^[a-z][a-z0-9+.-]*://.*");
