@@ -51,4 +51,25 @@ class ShortUrlTest {
 
         assertThat(shortUrl.getCreatedAt()).isNotNull();
     }
+
+    @Test
+    void isExpiredIsFalseWhenExpiresAtIsNull() {
+        ShortUrl shortUrl = new ShortUrl("https://example.com", "abc123", null);
+
+        assertThat(shortUrl.isExpired()).isFalse();
+    }
+
+    @Test
+    void isExpiredIsFalseWhenExpiresAtIsInTheFuture() {
+        ShortUrl shortUrl = new ShortUrl("https://example.com", "abc123", OffsetDateTime.now().plusDays(1));
+
+        assertThat(shortUrl.isExpired()).isFalse();
+    }
+
+    @Test
+    void isExpiredIsTrueWhenExpiresAtIsInThePast() {
+        ShortUrl shortUrl = new ShortUrl("https://example.com", "abc123", OffsetDateTime.now().minusSeconds(1));
+
+        assertThat(shortUrl.isExpired()).isTrue();
+    }
 }
