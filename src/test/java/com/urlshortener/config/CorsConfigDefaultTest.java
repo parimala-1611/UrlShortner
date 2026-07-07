@@ -1,5 +1,6 @@
 package com.urlshortener.config;
 
+import com.urlshortener.service.AnalyticsService;
 import com.urlshortener.service.QrCodeService;
 import com.urlshortener.service.ShortUrlService;
 import com.urlshortener.web.ShortUrlController;
@@ -25,6 +26,9 @@ class CorsConfigDefaultTest {
 
     @MockBean
     private QrCodeService qrCodeService;
+
+    @MockBean
+    private AnalyticsService analyticsService;
 
     @Test
     void rejectsAnyOriginWhenNoneConfigured() throws Exception {

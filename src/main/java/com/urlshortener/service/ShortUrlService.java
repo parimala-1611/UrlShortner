@@ -1,6 +1,8 @@
 package com.urlshortener.service;
 
+import com.urlshortener.model.ClickEvent;
 import com.urlshortener.model.ShortUrl;
+import com.urlshortener.repository.ClickEventRepository;
 import com.urlshortener.repository.ShortUrlRepository;
 import com.urlshortener.service.exception.ShortCodeGenerationException;
 import com.urlshortener.service.exception.ShortUrlExpiredException;
@@ -21,13 +23,16 @@ public class ShortUrlService {
     private final ShortUrlRepository repository;
     private final UrlNormalizer urlNormalizer;
     private final ShortCodeGenerator codeGenerator;
+    private final ClickEventRepository clickEventRepository;
     private final long defaultExpiryDays;
 
     public ShortUrlService(ShortUrlRepository repository, UrlNormalizer urlNormalizer, ShortCodeGenerator codeGenerator,
+            ClickEventRepository clickEventRepository,
             @Value("${app.retention.default-expiry-days:365}") long defaultExpiryDays) {
         this.repository = repository;
         this.urlNormalizer = urlNormalizer;
         this.codeGenerator = codeGenerator;
+        this.clickEventRepository = clickEventRepository;
         this.defaultExpiryDays = defaultExpiryDays;
     }
 
@@ -68,6 +73,11 @@ public class ShortUrlService {
 
     @Transactional
     public ShortUrl resolve(String shortCode) {
+        return resolve(shortCode, null);
+    }
+
+    @Transactional
+    public ShortUrl resolve(String shortCode, String referrer) {
         ShortUrl shortUrl = repository.findByShortCode(shortCode)
                 .orElseThrow(() -> new ShortUrlNotFoundException(shortCode));
 
@@ -76,6 +86,7 @@ public class ShortUrlService {
         }
 
         shortUrl.incrementClickCount();
+        clickEventRepository.save(new ClickEvent(shortUrl.getId(), referrer));
         return shortUrl;
     }
 

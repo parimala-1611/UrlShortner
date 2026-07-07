@@ -29,6 +29,27 @@ CREATE TABLE short_urls (
 );
 ```
 
+## Database: `click_events` table
+
+Defined in `src/main/resources/db/migration/V2__click_events.sql`. One row per
+successful redirect, feeding the analytics endpoint's aggregation.
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `id` | `BIGSERIAL` | no | Primary key |
+| `short_url_id` | `BIGINT` | no | References `short_urls.id` |
+| `clicked_at` | `TIMESTAMPTZ` | no | Set server-side when the redirect happens |
+| `referrer` | `TEXT` | yes | Raw HTTP `Referer` header value; `NULL` if absent. Client-supplied and unverified. |
+
+```sql
+CREATE TABLE click_events (
+    id              BIGSERIAL PRIMARY KEY,
+    short_url_id    BIGINT NOT NULL REFERENCES short_urls(id),
+    clicked_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    referrer        TEXT NULL
+);
+```
+
 ## JSON: request/response DTOs
 
 Java source of truth: `src/main/java/com/urlshortener/web/dto/`.
@@ -85,6 +106,33 @@ Same shape as `ShortenResponse` but with `clickCount` instead of `shortUrl`, and
 returned even if the link has already expired (expiry only blocks the redirect
 endpoint, not stats).
 
+### `AnalyticsResponse` — body of `200` from `GET /api/urls/{shortCode}/analytics`
+
+```json
+{
+  "shortCode": "abc12345",
+  "totalClicks": 42,
+  "dailyClickCounts": [
+    {"date": "2026-07-06", "count": 30},
+    {"date": "2026-07-07", "count": 12}
+  ],
+  "topReferrers": [
+    {"referrer": "https://twitter.com", "count": 25},
+    {"referrer": "(direct)", "count": 17}
+  ]
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `shortCode` | string | Echoes the path parameter |
+| `totalClicks` | integer | Same value as `clickCount` on the stats endpoint |
+| `dailyClickCounts` | array | Ascending by date; only days with at least one click appear (no zero-filled gaps) |
+| `topReferrers` | array | Descending by count, capped at 10; missing/blank `Referer` header is grouped as `(direct)` |
+
+Returned even if the link has expired (same as stats). No auth — anyone with the
+`shortCode` can view it.
+
 ### `ErrorResponse` — body of every non-2xx response
 
 ```json
@@ -102,9 +150,9 @@ don't pattern-match on it in the frontend; use the HTTP status code to branch lo
 |---|---|---|
 | `201 Created` | Short URL created or dedup match returned | `POST /api/urls` |
 | `302 Found` | Valid, non-expired code | `GET /{shortCode}` |
-| `200 OK` | Code exists (expired or not) | `GET /api/urls/{shortCode}`, `GET /api/urls/{shortCode}/qr` |
+| `200 OK` | Code exists (expired or not) | `GET /api/urls/{shortCode}`, `GET /api/urls/{shortCode}/qr`, `GET /api/urls/{shortCode}/analytics` |
 | `400 Bad Request` | Blank/invalid `url`, malformed input | `POST /api/urls` |
-| `404 Not Found` | Unknown `shortCode` | `GET /{shortCode}`, `GET /api/urls/{shortCode}`, `GET /api/urls/{shortCode}/qr` |
+| `404 Not Found` | Unknown `shortCode` | `GET /{shortCode}`, `GET /api/urls/{shortCode}`, `GET /api/urls/{shortCode}/qr`, `GET /api/urls/{shortCode}/analytics` |
 | `410 Gone` | Code exists but `expiresAt` is in the past | `GET /{shortCode}` only (QR generation does not check expiry) |
 | `500 Internal Server Error` | Short-code generation exhausted all collision retries (extremely rare) | `POST /api/urls` |
 

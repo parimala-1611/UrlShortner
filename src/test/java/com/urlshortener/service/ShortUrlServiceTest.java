@@ -1,6 +1,8 @@
 package com.urlshortener.service;
 
+import com.urlshortener.model.ClickEvent;
 import com.urlshortener.model.ShortUrl;
+import com.urlshortener.repository.ClickEventRepository;
 import com.urlshortener.repository.ShortUrlRepository;
 import com.urlshortener.service.exception.ShortCodeGenerationException;
 import com.urlshortener.service.exception.ShortUrlExpiredException;
@@ -9,6 +11,7 @@ import com.urlshortener.util.UrlNormalizer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -37,11 +40,14 @@ class ShortUrlServiceTest {
     @Mock
     private ShortCodeGenerator codeGenerator;
 
+    @Mock
+    private ClickEventRepository clickEventRepository;
+
     private ShortUrlService service;
 
     @BeforeEach
     void setUp() {
-        service = new ShortUrlService(repository, urlNormalizer, codeGenerator, 365);
+        service = new ShortUrlService(repository, urlNormalizer, codeGenerator, clickEventRepository, 365);
     }
 
     @Test
@@ -178,13 +184,41 @@ class ShortUrlServiceTest {
     }
 
     @Test
-    void resolveIncrementsClickCountForNonExpiredCode() {
+    void resolveIncrementsClickCountForNonExpiredCode() throws Exception {
         ShortUrl shortUrl = new ShortUrl("https://example.com", "code1", null);
+        setId(shortUrl, 1L);
         when(repository.findByShortCode("code1")).thenReturn(Optional.of(shortUrl));
 
         ShortUrl result = service.resolve("code1");
 
         assertThat(result.getClickCount()).isEqualTo(1L);
+    }
+
+    @Test
+    void resolveRecordsClickEventWithReferrer() throws Exception {
+        ShortUrl shortUrl = new ShortUrl("https://example.com", "code1", null);
+        setId(shortUrl, 1L);
+        when(repository.findByShortCode("code1")).thenReturn(Optional.of(shortUrl));
+
+        service.resolve("code1", "https://twitter.com");
+
+        ArgumentCaptor<ClickEvent> captor = ArgumentCaptor.forClass(ClickEvent.class);
+        verify(clickEventRepository).save(captor.capture());
+        assertThat(captor.getValue().getShortUrlId()).isEqualTo(1L);
+        assertThat(captor.getValue().getReferrer()).isEqualTo("https://twitter.com");
+    }
+
+    @Test
+    void resolveRecordsClickEventWithNullReferrerWhenNotProvided() throws Exception {
+        ShortUrl shortUrl = new ShortUrl("https://example.com", "code1", null);
+        setId(shortUrl, 1L);
+        when(repository.findByShortCode("code1")).thenReturn(Optional.of(shortUrl));
+
+        service.resolve("code1");
+
+        ArgumentCaptor<ClickEvent> captor = ArgumentCaptor.forClass(ClickEvent.class);
+        verify(clickEventRepository).save(captor.capture());
+        assertThat(captor.getValue().getReferrer()).isNull();
     }
 
     @Test
@@ -203,6 +237,13 @@ class ShortUrlServiceTest {
         assertThatThrownBy(() -> service.resolve("code1"))
                 .isInstanceOf(ShortUrlExpiredException.class);
         assertThat(shortUrl.getClickCount()).isZero();
+        verify(clickEventRepository, never()).save(any());
+    }
+
+    private static void setId(ShortUrl shortUrl, Long id) throws Exception {
+        java.lang.reflect.Field field = ShortUrl.class.getDeclaredField("id");
+        field.setAccessible(true);
+        field.set(shortUrl, id);
     }
 
     @Test

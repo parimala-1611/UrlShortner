@@ -2,10 +2,14 @@ package com.urlshortener.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.urlshortener.model.ShortUrl;
+import com.urlshortener.service.AnalyticsService;
 import com.urlshortener.service.QrCodeService;
 import com.urlshortener.service.ShortUrlService;
 import com.urlshortener.service.exception.ShortUrlExpiredException;
 import com.urlshortener.service.exception.ShortUrlNotFoundException;
+import com.urlshortener.web.dto.AnalyticsResponse;
+import com.urlshortener.web.dto.DailyClickCount;
+import com.urlshortener.web.dto.ReferrerCount;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -13,7 +17,9 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -38,6 +44,9 @@ class ShortUrlControllerTest {
 
     @MockBean
     private QrCodeService qrCodeService;
+
+    @MockBean
+    private AnalyticsService analyticsService;
 
     @Test
     void shortenReturnsCreatedWithShortenedUrlDetails() throws Exception {
@@ -97,7 +106,7 @@ class ShortUrlControllerTest {
     @Test
     void redirectReturnsFoundWithLocationHeader() throws Exception {
         ShortUrl shortUrl = new ShortUrl("https://example.com/page", "abc12345", null);
-        when(shortUrlService.resolve("abc12345")).thenReturn(shortUrl);
+        when(shortUrlService.resolve(eq("abc12345"), any())).thenReturn(shortUrl);
 
         mockMvc.perform(get("/abc12345"))
                 .andExpect(status().isFound())
@@ -105,8 +114,17 @@ class ShortUrlControllerTest {
     }
 
     @Test
+    void redirectPassesRefererHeaderThrough() throws Exception {
+        ShortUrl shortUrl = new ShortUrl("https://example.com/page", "abc12345", null);
+        when(shortUrlService.resolve("abc12345", "https://twitter.com")).thenReturn(shortUrl);
+
+        mockMvc.perform(get("/abc12345").header("Referer", "https://twitter.com"))
+                .andExpect(status().isFound());
+    }
+
+    @Test
     void redirectReturnsNotFoundForUnknownCode() throws Exception {
-        when(shortUrlService.resolve("missing")).thenThrow(new ShortUrlNotFoundException("missing"));
+        when(shortUrlService.resolve(eq("missing"), any())).thenThrow(new ShortUrlNotFoundException("missing"));
 
         mockMvc.perform(get("/missing"))
                 .andExpect(status().isNotFound());
@@ -114,7 +132,7 @@ class ShortUrlControllerTest {
 
     @Test
     void redirectReturnsGoneForExpiredCode() throws Exception {
-        when(shortUrlService.resolve("expired")).thenThrow(new ShortUrlExpiredException("expired"));
+        when(shortUrlService.resolve(eq("expired"), any())).thenThrow(new ShortUrlExpiredException("expired"));
 
         mockMvc.perform(get("/expired"))
                 .andExpect(status().isGone());
@@ -171,6 +189,30 @@ class ShortUrlControllerTest {
 
         mockMvc.perform(get("/api/urls/expired1/qr"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void analyticsReturnsOkWithBreakdown() throws Exception {
+        AnalyticsResponse response = new AnalyticsResponse(
+                "abc12345", 3L,
+                List.of(new DailyClickCount(LocalDate.of(2026, 1, 1), 3L)),
+                List.of(new ReferrerCount("https://twitter.com", 2L), new ReferrerCount("(direct)", 1L)));
+        when(analyticsService.getAnalytics("abc12345")).thenReturn(response);
+
+        mockMvc.perform(get("/api/urls/abc12345/analytics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shortCode").value("abc12345"))
+                .andExpect(jsonPath("$.totalClicks").value(3))
+                .andExpect(jsonPath("$.dailyClickCounts[0].count").value(3))
+                .andExpect(jsonPath("$.topReferrers[0].referrer").value("https://twitter.com"));
+    }
+
+    @Test
+    void analyticsReturnsNotFoundForUnknownCode() throws Exception {
+        when(analyticsService.getAnalytics("missing")).thenThrow(new ShortUrlNotFoundException("missing"));
+
+        mockMvc.perform(get("/api/urls/missing/analytics"))
+                .andExpect(status().isNotFound());
     }
 
     private record ShortenRequestJson(String url, OffsetDateTime expiresAt, String customAlias) {

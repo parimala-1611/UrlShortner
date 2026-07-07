@@ -104,6 +104,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/urls/{shortCode}/analytics:
+    get:
+      summary: Get analytics for a short URL
+      description: >
+        Returns total clicks, a daily click-count breakdown, and top referrers.
+        Scope is deliberately narrow (no unique-visitor tracking, geography, or
+        device breakdown) - see docs/BACKEND.md "Analytics" section. Does not
+        check expiry and does not increment the click count.
+      operationId: getShortUrlAnalytics
+      parameters:
+        - $ref: "#/components/parameters/ShortCode"
+      responses:
+        "200":
+          description: Analytics breakdown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsResponse"
+        "404":
+          description: Unknown short code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /{shortCode}:
     get:
       summary: Redirect to the original URL
@@ -222,6 +247,40 @@ components:
           type: integer
           format: int64
           example: 42
+
+    AnalyticsResponse:
+      type: object
+      properties:
+        shortCode:
+          type: string
+          example: "a1B2c3D4"
+        totalClicks:
+          type: integer
+          format: int64
+          example: 42
+        dailyClickCounts:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              count:
+                type: integer
+                format: int64
+        topReferrers:
+          type: array
+          description: Descending by count, capped at 10. Missing/blank Referer is grouped as "(direct)".
+          items:
+            type: object
+            properties:
+              referrer:
+                type: string
+                example: "https://twitter.com"
+              count:
+                type: integer
+                format: int64
 
     ErrorResponse:
       type: object

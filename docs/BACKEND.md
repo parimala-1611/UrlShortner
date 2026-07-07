@@ -16,6 +16,7 @@ for the formal API contract.
 | Click count | Every successful redirect increments a counter, visible via the stats endpoint. |
 | Stats lookup | `/api/urls/{shortCode}` returns metadata (original URL, timestamps, click count) without triggering a redirect or click increment. |
 | QR code | `/api/urls/{shortCode}/qr` returns a PNG QR code encoding the short link. Works for expired codes too (encoding the link isn't the same as redirecting through it), and doesn't increment the click count. |
+| Analytics | `/api/urls/{shortCode}/analytics` returns total clicks, a daily click-count breakdown, and top referrers (from the HTTP `Referer` header on each redirect). See "Analytics" below for exact scope. |
 | Strict URL validation | Only real `http`/`https` URLs are accepted — see Validation rules below. |
 
 ## How shortening works
@@ -71,6 +72,21 @@ default) and no cross-origin browser requests are allowed at all; set it to enab
 specific frontend dev server or production frontend origin. See
 [`FRONTEND_INTEGRATION.md`](./FRONTEND_INTEGRATION.md) for exact setup steps.
 
+## Analytics
+
+Scope, deliberately kept narrow (see `orchestrator/artifacts/ambiguous/requirements.md`
+for the full ambiguity/assumptions writeup this was built against):
+
+- **Daily click counts** — click volume per calendar day (UTC), derived from a new
+  `click_events` row recorded on every successful redirect.
+- **Top referrers** — the HTTP `Referer` header seen on each redirect, grouped and
+  ranked by count (top 10). Requests with no `Referer` are grouped under `(direct)`.
+- **Not included**: unique-visitor tracking, geography, device/browser breakdown, a
+  dashboard UI, or historical backfill for clicks that happened before this shipped —
+  all explicitly deferred, not overlooked.
+- Same access model as the rest of the API: no auth, anyone with a valid `shortCode`
+  can view its analytics.
+
 ## Endpoints
 
 | Method | Path | Purpose | Success | Failure |
@@ -79,6 +95,7 @@ specific frontend dev server or production frontend origin. See
 | `GET` | `/{shortCode}` | Redirect + increment clicks | `302 Found` (`Location` header) | `404` unknown code, `410` expired |
 | `GET` | `/api/urls/{shortCode}` | Read stats, no side effects | `200 OK` | `404` unknown code |
 | `GET` | `/api/urls/{shortCode}/qr` | PNG QR code for the short link | `200 OK` (`image/png`) | `404` unknown code |
+| `GET` | `/api/urls/{shortCode}/analytics` | Daily click counts + top referrers | `200 OK` | `404` unknown code |
 
 All error responses share one shape: `{ "error": "<message>" }`.
 
