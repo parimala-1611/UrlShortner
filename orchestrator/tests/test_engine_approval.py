@@ -2,6 +2,7 @@ import shutil
 import unittest
 
 from orchestrator.engine import Engine
+from orchestrator.metrics import compute_run_metrics
 from orchestrator.pipeline import Pipeline, Stage
 from orchestrator.tests import fixture_stages
 from orchestrator.tests.test_helpers import make_temp_git_repo
@@ -46,6 +47,21 @@ class EngineApprovalTest(unittest.TestCase):
         self.assertEqual(terminal, "completed")
         self.assertEqual(resumed.status["gate"].value, "passed")
         self.assertEqual(resumed.status["after"].value, "passed")
+
+    def test_approval_pause_then_resume_does_not_skew_success_rate(self):
+        engine = Engine(self._pipeline(), "run-approval-3", self.run_dir, self.repo)
+        engine.run()
+
+        resumed = Engine.resume(self._pipeline(), "run-approval-3", self.run_dir, self.repo)
+        resumed.approvals.add("gate")
+        resumed.run()
+
+        report = compute_run_metrics(self.run_dir)
+        # Both stages actually passed; the approval pause/resume must not look
+        # like a failed attempt in the reliability metrics.
+        self.assertEqual(report["stages_attempted"], 2)
+        self.assertEqual(report["stages_passed"], 2)
+        self.assertEqual(report["success_rate"], 1.0)
 
 
 if __name__ == "__main__":

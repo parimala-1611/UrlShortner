@@ -193,13 +193,17 @@ class Engine:
             if self.status[stage.name] != StageStatus.PENDING:
                 return
             self.status[stage.name] = StageStatus.RUNNING
-        self.audit.record(self.run_id, stage.name, "enter")
 
         if stage.requires_approval and stage.name not in self.approvals:
             self.audit.record(self.run_id, stage.name, "approval_requested")
             with self._lock:
                 self.status[stage.name] = StageStatus.PENDING
             raise ApprovalRequired(stage.name)
+
+        # "enter" marks the start of real execution, after any approval gate -
+        # kept 1:1 with the eventual pass/fail event so metrics aren't skewed
+        # by an approval pause-then-resume (which isn't a failure).
+        self.audit.record(self.run_id, stage.name, "enter")
         if stage.requires_approval and stage.name in self.approvals:
             self.audit.record(self.run_id, stage.name, "approval_granted")
 
