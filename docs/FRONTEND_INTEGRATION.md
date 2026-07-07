@@ -4,18 +4,27 @@ Everything a frontend needs: base URL, contract, error handling, and gotchas.
 Read [`BACKEND.md`](./BACKEND.md) for feature behavior and [`schemas.md`](./schemas.md)
 for exact field shapes first — this doc is the practical "how do I wire this up" layer.
 
-## 1. Before you start: CORS is not configured
+## 1. Before you start: enable CORS for your origin
 
-The backend has **no CORS configuration**. If your frontend dev server runs on a
+CORS is **disabled by default** (secure by default — no cross-origin browser requests
+are allowed until explicitly configured). If your frontend dev server runs on a
 different origin than the API (e.g. Vite on `localhost:5173`, CRA on `localhost:3000`,
-API on `localhost:8080`), browser requests will fail with a CORS error even though
-`curl`/Postman work fine.
+API on `localhost:8080`), you need the backend to allow your origin first, or requests
+will fail with a CORS error even though `curl`/Postman work fine.
 
-Options, in order of least effort:
-- Ask the backend owner to add a `WebMvcConfigurer` CORS mapping (or `@CrossOrigin`) for
-  your dev origin before you start integration.
-- Proxy API calls through your frontend dev server (e.g. Vite's `server.proxy`, CRA's
-  `"proxy"` field in `package.json`) so the browser only ever talks to one origin.
+Set `app.cors.allowed-origins` in `application.yml` (or via the
+`APP_CORS_ALLOWED-ORIGINS` environment variable) to a comma-separated list of origins,
+e.g.:
+
+```yaml
+app:
+  cors:
+    allowed-origins: "http://localhost:5173,http://localhost:3000"
+```
+
+Alternatively, proxy API calls through your frontend dev server (e.g. Vite's
+`server.proxy`, CRA's `"proxy"` field in `package.json`) so the browser only ever talks
+to one origin and CORS never comes into play.
 
 ## 2. Base URL
 

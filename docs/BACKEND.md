@@ -62,6 +62,15 @@ every conceivable fake domain, but it blocks the concrete cases above.
   past `expiresAt`). This is a permanent deletion, not a soft-delete — plan accordingly if you
   need long-term analytics on old links.
 
+## CORS
+
+Cross-origin requests are **disabled by default** (secure by default) and controlled by
+a single `application.yml` property: `app.cors.allowed-origins` — a comma-separated list
+of origins (e.g. `http://localhost:5173,http://localhost:3000`). Leave it empty (the
+default) and no cross-origin browser requests are allowed at all; set it to enable a
+specific frontend dev server or production frontend origin. See
+[`FRONTEND_INTEGRATION.md`](./FRONTEND_INTEGRATION.md) for exact setup steps.
+
 ## Endpoints
 
 | Method | Path | Purpose | Success | Failure |
@@ -77,10 +86,6 @@ All error responses share one shape: `{ "error": "<message>" }`.
 
 - **Authentication** — there is no login, API key, or per-user ownership of short URLs.
   Anyone can create or view any short URL's stats.
-- **CORS** — no CORS configuration exists yet. If your frontend runs on a different
-  origin (e.g. `localhost:5173` calling `localhost:8080`), browser requests will be
-  blocked until CORS is configured on the backend. Flag this to the backend team before
-  wiring up cross-origin calls.
 - **Rate limiting / abuse protection** — none.
 - **Pagination / listing** — there is no endpoint to list all short URLs; you must
   already know a short code to fetch its stats.

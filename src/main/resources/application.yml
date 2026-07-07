@@ -21,3 +21,7 @@ app:
     default-expiry-days: 365
     purge-after-days: 90
     purge-cron: "0 0 3 * * *"
+  cors:
+    # Comma-separated list of allowed origins, e.g. "http://localhost:5173,http://localhost:3000"
+    # Empty by default (secure by default) - no cross-origin requests are allowed until configured.
+    allowed-origins: ""
