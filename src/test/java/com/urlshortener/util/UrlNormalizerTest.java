@@ -92,4 +92,46 @@ class UrlNormalizerTest {
         assertThatThrownBy(() -> normalizer.normalize("https://exa mple.com"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void rejectsNonHttpSchemes() {
+        assertThatThrownBy(() -> normalizer.normalize("ftp://example.com/file"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> normalizer.normalize("mailto:test@example.com"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> normalizer.normalize("javascript:alert(1)"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> normalizer.normalize("file:///C:/Users/file.txt"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsJumbledTextWithNoDomainStructure() {
+        assertThatThrownBy(() -> normalizer.normalize("asdkjhasdkjh"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> normalizer.normalize("randomtext123"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsFileLikeHosts() {
+        assertThatThrownBy(() -> normalizer.normalize("malware.exe"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> normalizer.normalize("document.pdf"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> normalizer.normalize("song.mp3"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> normalizer.normalize("archive.zip"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void acceptsValidDomainsAndIpsAndLocalhost() {
+        assertThat(normalizer.normalize("https://www.example.com/path?x=1"))
+                .isEqualTo("https://www.example.com/path?x=1");
+        assertThat(normalizer.normalize("http://192.168.1.1/page"))
+                .isEqualTo("http://192.168.1.1/page");
+        assertThat(normalizer.normalize("http://localhost:8080/test"))
+                .isEqualTo("http://localhost:8080/test");
+    }
 }

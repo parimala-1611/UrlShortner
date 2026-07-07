@@ -41,7 +41,7 @@ class ShortUrlServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ShortUrlService(repository, urlNormalizer, codeGenerator);
+        service = new ShortUrlService(repository, urlNormalizer, codeGenerator, 365);
     }
 
     @Test
@@ -118,6 +118,63 @@ class ShortUrlServiceTest {
         assertThatThrownBy(() -> service.shorten("raw", null))
                 .isInstanceOf(ShortCodeGenerationException.class);
         verify(codeGenerator, times(totalAttempts)).generate(eq("normalized"), anyInt());
+    }
+
+    @Test
+    void shortenUsesAvailableCustomAliasDirectly() {
+        when(urlNormalizer.normalize("raw")).thenReturn("normalized");
+        when(repository.findByOriginalUrl("normalized")).thenReturn(Optional.empty());
+        when(repository.findByShortCode("myalias123")).thenReturn(Optional.empty());
+        when(repository.save(any(ShortUrl.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShortUrl result = service.shorten("raw", null, "myalias123");
+
+        assertThat(result.getShortCode()).isEqualTo("myalias123");
+        verify(codeGenerator, never()).generate(any(), anyInt());
+    }
+
+    @Test
+    void shortenFallsBackToHashGenerationWhenAliasIsTaken() {
+        ShortUrl aliasOwner = new ShortUrl("other-normalized", "myalias123", null);
+        when(urlNormalizer.normalize("raw")).thenReturn("normalized");
+        when(repository.findByOriginalUrl("normalized")).thenReturn(Optional.empty());
+        when(repository.findByShortCode("myalias123")).thenReturn(Optional.of(aliasOwner));
+        when(codeGenerator.generate("normalized", 0)).thenReturn("codeA");
+        when(repository.findByShortCode("codeA")).thenReturn(Optional.empty());
+        when(repository.save(any(ShortUrl.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShortUrl result = service.shorten("raw", null, "myalias123");
+
+        assertThat(result.getShortCode()).isEqualTo("codeA");
+    }
+
+    @Test
+    void shortenAppliesDefaultExpiryWhenNoneProvided() {
+        when(urlNormalizer.normalize("raw")).thenReturn("normalized");
+        when(repository.findByOriginalUrl("normalized")).thenReturn(Optional.empty());
+        when(codeGenerator.generate("normalized", 0)).thenReturn("code1");
+        when(repository.findByShortCode("code1")).thenReturn(Optional.empty());
+        when(repository.save(any(ShortUrl.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OffsetDateTime before = OffsetDateTime.now().plusDays(365);
+        ShortUrl result = service.shorten("raw", null);
+        OffsetDateTime after = OffsetDateTime.now().plusDays(365);
+
+        assertThat(result.getExpiresAt()).isBetween(before.minusSeconds(5), after.plusSeconds(5));
+    }
+
+    @Test
+    void shortenKeepsExplicitExpiryWhenProvided() {
+        OffsetDateTime explicitExpiry = OffsetDateTime.now().plusDays(10);
+        when(urlNormalizer.normalize("raw")).thenReturn("normalized");
+        when(repository.findByOriginalUrl("normalized")).thenReturn(Optional.empty());
+        when(codeGenerator.generate("normalized", 0)).thenReturn("code1");
+        when(repository.findByShortCode("code1")).thenReturn(Optional.empty());
+        when(repository.save(any(ShortUrl.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShortUrl result = service.shorten("raw", explicitExpiry);
+
+        assertThat(result.getExpiresAt()).isEqualTo(explicitExpiry);
     }
 
     @Test

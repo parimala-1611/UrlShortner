@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: URL Shortener API
+  description: >
+    Anonymous URL shortening service. No authentication. See docs/BACKEND.md
+    and docs/schemas.md for narrative documentation.
+  version: "0.1.0"
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+paths:
+  /api/urls:
+    post:
+      summary: Shorten a URL
+      description: >
+        Creates a new short URL, or returns the existing one if this exact
+        URL (after normalization) has already been shortened.
+      operationId: shortenUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShortenRequest"
+            examples:
+              withoutExpiry:
+                value:
+                  url: "https://example.com/some/long/path"
+              withExpiry:
+                value:
+                  url: "https://example.com/some/long/path"
+                  expiresAt: "2026-12-31T23:59:59Z"
+              withCustomAlias:
+                value:
+                  url: "https://example.com/some/long/path"
+                  customAlias: "mylink12"
+      responses:
+        "201":
+          description: Short URL created (or existing dedup match returned)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShortenResponse"
+        "400":
+          description: Blank or invalid URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Short-code generation exhausted all collision retries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/urls/{shortCode}:
+    get:
+      summary: Get stats for a short URL
+      description: >
+        Returns metadata without redirecting or incrementing the click count.
+        Returned even if the code has expired.
+      operationId: getShortUrlStats
+      parameters:
+        - $ref: "#/components/parameters/ShortCode"
+      responses:
+        "200":
+          description: Short URL metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShortUrlStatsResponse"
+        "404":
+          description: Unknown short code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /{shortCode}:
+    get:
+      summary: Redirect to the original URL
+      description: >
+        Increments the click count and issues a 302 redirect. Returns 410 if
+        the link has expired instead of redirecting.
+      operationId: redirectShortUrl
+      parameters:
+        - $ref: "#/components/parameters/ShortCode"
+      responses:
+        "302":
+          description: Redirect to the original URL
+          headers:
+            Location:
+              description: The original (normalized) URL
+              schema:
+                type: string
+                format: uri
+        "404":
+          description: Unknown short code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: Short URL has expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  parameters:
+    ShortCode:
+      name: shortCode
+      in: path
+      required: true
+      description: 6-12 character short code (8-char Base62 if generated, 6-12 chars if a custom alias)
+      schema:
+        type: string
+        pattern: "^[0-9a-zA-Z]{6,12}$"
+        example: "a1B2c3D4"
+
+  schemas:
+    ShortenRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          description: >
+            The URL to shorten. Must be a real http/https URL: scheme is optional
+            (https:// assumed if missing) but other schemes, gibberish text, and
+            file-like hosts (.exe, .pdf, etc.) are rejected with 400.
+          example: "https://example.com/some/long/path"
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            Optional expiry timestamp (ISO-8601). If omitted, a default expiry
+            is applied automatically (365 days by default) rather than never
+            expiring. Not validated to be in the future.
+          example: "2026-12-31T23:59:59Z"
+        customAlias:
+          type: string
+          nullable: true
+          pattern: "^[0-9a-zA-Z]{6,12}$"
+          description: >
+            Optional custom short code, 6-12 alphanumeric characters. If available,
+            used directly. If already taken, the request silently falls back to
+            standard hash-based generation instead of returning an error.
+          example: "mylink12"
+
+    ShortenResponse:
+      type: object
+      properties:
+        shortCode:
+          type: string
+          example: "a1B2c3D4"
+        shortUrl:
+          type: string
+          format: uri
+          description: Full redirect URL, ready to display/copy.
+          example: "http://localhost:8080/a1B2c3D4"
+        originalUrl:
+          type: string
+          format: uri
+          description: Normalized form of the submitted URL.
+          example: "https://example.com/some/long/path"
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          description: Either the submitted value or the auto-assigned default; never null for a newly-created link.
+
+    ShortUrlStatsResponse:
+      type: object
+      properties:
+        shortCode:
+          type: string
+          example: "a1B2c3D4"
+        originalUrl:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        clickCount:
+          type: integer
+          format: int64
+          example: 42
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "No short URL found for code: missing"

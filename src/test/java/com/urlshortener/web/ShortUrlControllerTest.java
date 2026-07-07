@@ -38,11 +38,11 @@ class ShortUrlControllerTest {
     @Test
     void shortenReturnsCreatedWithShortenedUrlDetails() throws Exception {
         ShortUrl shortUrl = new ShortUrl("https://example.com/page", "abc12345", null);
-        when(shortUrlService.shorten(eq("https://example.com/page"), any())).thenReturn(shortUrl);
+        when(shortUrlService.shorten(eq("https://example.com/page"), any(), any())).thenReturn(shortUrl);
 
         mockMvc.perform(post("/api/urls")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new ShortenRequestJson("https://example.com/page", null))))
+                        .content(objectMapper.writeValueAsString(new ShortenRequestJson("https://example.com/page", null, null))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.shortCode").value("abc12345"))
                 .andExpect(jsonPath("$.originalUrl").value("https://example.com/page"))
@@ -53,19 +53,41 @@ class ShortUrlControllerTest {
     void shortenRejectsBlankUrlWithBadRequest() throws Exception {
         mockMvc.perform(post("/api/urls")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new ShortenRequestJson("", null))))
+                        .content(objectMapper.writeValueAsString(new ShortenRequestJson("", null, null))))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void shortenReturnsBadRequestWhenServiceRejectsInvalidUrl() throws Exception {
-        when(shortUrlService.shorten(eq("not a valid url"), any()))
+        when(shortUrlService.shorten(eq("not a valid url"), any(), any()))
                 .thenThrow(new IllegalArgumentException("Invalid URL: not a valid url"));
 
         mockMvc.perform(post("/api/urls")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new ShortenRequestJson("not a valid url", null))))
+                        .content(objectMapper.writeValueAsString(new ShortenRequestJson("not a valid url", null, null))))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shortenRejectsCustomAliasShorterThanSixCharacters() throws Exception {
+        mockMvc.perform(post("/api/urls")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new ShortenRequestJson("https://example.com/page", null, "abc"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shortenUsesProvidedCustomAlias() throws Exception {
+        ShortUrl shortUrl = new ShortUrl("https://example.com/page", "myalias123", null);
+        when(shortUrlService.shorten(eq("https://example.com/page"), any(), eq("myalias123"))).thenReturn(shortUrl);
+
+        mockMvc.perform(post("/api/urls")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new ShortenRequestJson("https://example.com/page", null, "myalias123"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.shortCode").value("myalias123"));
     }
 
     @Test
@@ -114,6 +136,6 @@ class ShortUrlControllerTest {
                 .andExpect(status().isNotFound());
     }
 
-    private record ShortenRequestJson(String url, OffsetDateTime expiresAt) {
+    private record ShortenRequestJson(String url, OffsetDateTime expiresAt, String customAlias) {
     }
 }

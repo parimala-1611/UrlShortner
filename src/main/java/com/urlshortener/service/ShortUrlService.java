@@ -6,6 +6,7 @@ import com.urlshortener.service.exception.ShortCodeGenerationException;
 import com.urlshortener.service.exception.ShortUrlExpiredException;
 import com.urlshortener.service.exception.ShortUrlNotFoundException;
 import com.urlshortener.util.UrlNormalizer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,22 +21,35 @@ public class ShortUrlService {
     private final ShortUrlRepository repository;
     private final UrlNormalizer urlNormalizer;
     private final ShortCodeGenerator codeGenerator;
+    private final long defaultExpiryDays;
 
-    public ShortUrlService(ShortUrlRepository repository, UrlNormalizer urlNormalizer, ShortCodeGenerator codeGenerator) {
+    public ShortUrlService(ShortUrlRepository repository, UrlNormalizer urlNormalizer, ShortCodeGenerator codeGenerator,
+            @Value("${app.retention.default-expiry-days:365}") long defaultExpiryDays) {
         this.repository = repository;
         this.urlNormalizer = urlNormalizer;
         this.codeGenerator = codeGenerator;
+        this.defaultExpiryDays = defaultExpiryDays;
     }
 
     @Transactional
     public ShortUrl shorten(String rawUrl, OffsetDateTime expiresAt) {
-        String normalizedUrl = urlNormalizer.normalize(rawUrl);
-
-        return repository.findByOriginalUrl(normalizedUrl)
-                .orElseGet(() -> createShortUrl(normalizedUrl, expiresAt));
+        return shorten(rawUrl, expiresAt, null);
     }
 
-    private ShortUrl createShortUrl(String normalizedUrl, OffsetDateTime expiresAt) {
+    @Transactional
+    public ShortUrl shorten(String rawUrl, OffsetDateTime expiresAt, String customAlias) {
+        String normalizedUrl = urlNormalizer.normalize(rawUrl);
+        OffsetDateTime effectiveExpiresAt = expiresAt != null ? expiresAt : OffsetDateTime.now().plusDays(defaultExpiryDays);
+
+        return repository.findByOriginalUrl(normalizedUrl)
+                .orElseGet(() -> createShortUrl(normalizedUrl, effectiveExpiresAt, customAlias));
+    }
+
+    private ShortUrl createShortUrl(String normalizedUrl, OffsetDateTime expiresAt, String customAlias) {
+        if (customAlias != null && !customAlias.isBlank() && repository.findByShortCode(customAlias).isEmpty()) {
+            return repository.save(new ShortUrl(normalizedUrl, customAlias, expiresAt));
+        }
+
         for (int attempt = 0; attempt <= MAX_COLLISION_ATTEMPTS; attempt++) {
             String code = codeGenerator.generate(normalizedUrl, attempt);
             Optional<ShortUrl> existing = repository.findByShortCode(code);

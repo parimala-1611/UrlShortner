@@ -27,7 +27,7 @@ public class ShortUrlController {
 
     @PostMapping("/api/urls")
     public ResponseEntity<ShortenResponse> shorten(@Valid @RequestBody ShortenRequest request) {
-        ShortUrl shortUrl = shortUrlService.shorten(request.url(), request.expiresAt());
+        ShortUrl shortUrl = shortUrlService.shorten(request.url(), request.expiresAt(), request.customAlias());
 
         String shortUrlLink = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path("/{shortCode}")

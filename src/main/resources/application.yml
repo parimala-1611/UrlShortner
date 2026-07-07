@@ -15,3 +15,9 @@ spring:
 
 server:
   port: 8080
+
+app:
+  retention:
+    default-expiry-days: 365
+    purge-after-days: 90
+    purge-cron: "0 0 3 * * *"
