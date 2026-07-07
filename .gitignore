@@ -8,7 +8,7 @@ target/
 .env
 
 # Orchestrator run output - generated audit logs/state, not source
+# (orchestrator/artifacts/ is NOT ignored - requirements/design docs live there and are real source)
 orchestrator/runs/
-orchestrator/artifacts/
 __pycache__/
 *.pyc

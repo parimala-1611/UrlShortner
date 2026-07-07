@@ -102,8 +102,15 @@ don't pattern-match on it in the frontend; use the HTTP status code to branch lo
 |---|---|---|
 | `201 Created` | Short URL created or dedup match returned | `POST /api/urls` |
 | `302 Found` | Valid, non-expired code | `GET /{shortCode}` |
-| `200 OK` | Code exists (expired or not) | `GET /api/urls/{shortCode}` |
+| `200 OK` | Code exists (expired or not) | `GET /api/urls/{shortCode}`, `GET /api/urls/{shortCode}/qr` |
 | `400 Bad Request` | Blank/invalid `url`, malformed input | `POST /api/urls` |
-| `404 Not Found` | Unknown `shortCode` | `GET /{shortCode}`, `GET /api/urls/{shortCode}` |
-| `410 Gone` | Code exists but `expiresAt` is in the past | `GET /{shortCode}` only |
+| `404 Not Found` | Unknown `shortCode` | `GET /{shortCode}`, `GET /api/urls/{shortCode}`, `GET /api/urls/{shortCode}/qr` |
+| `410 Gone` | Code exists but `expiresAt` is in the past | `GET /{shortCode}` only (QR generation does not check expiry) |
 | `500 Internal Server Error` | Short-code generation exhausted all collision retries (extremely rare) | `POST /api/urls` |
+
+## QR code endpoint
+
+`GET /api/urls/{shortCode}/qr` returns raw `image/png` bytes (not JSON) — a 300x300px
+PNG encoding the full `shortUrl` link (the same string `POST /api/urls` returns as
+`shortUrl`). No request/response DTO; the body is the image itself. Works regardless
+of whether the link has expired.

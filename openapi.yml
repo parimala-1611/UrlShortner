@@ -79,6 +79,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/urls/{shortCode}/qr:
+    get:
+      summary: Get a QR code for a short URL
+      description: >
+        Returns a PNG QR code encoding the short link. Does not check expiry
+        (encoding the link is not the same as redirecting through it) and does
+        not increment the click count.
+      operationId: getShortUrlQrCode
+      parameters:
+        - $ref: "#/components/parameters/ShortCode"
+      responses:
+        "200":
+          description: PNG image encoding the short link
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Unknown short code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /{shortCode}:
     get:
       summary: Redirect to the original URL

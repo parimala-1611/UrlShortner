@@ -1,6 +1,7 @@
 package com.urlshortener.web;
 
 import com.urlshortener.model.ShortUrl;
+import com.urlshortener.service.QrCodeService;
 import com.urlshortener.service.ShortUrlService;
 import com.urlshortener.web.dto.ShortUrlStatsResponse;
 import com.urlshortener.web.dto.ShortenRequest;
@@ -8,6 +9,7 @@ import com.urlshortener.web.dto.ShortenResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,9 +22,11 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class ShortUrlController {
 
     private final ShortUrlService shortUrlService;
+    private final QrCodeService qrCodeService;
 
-    public ShortUrlController(ShortUrlService shortUrlService) {
+    public ShortUrlController(ShortUrlService shortUrlService, QrCodeService qrCodeService) {
         this.shortUrlService = shortUrlService;
+        this.qrCodeService = qrCodeService;
     }
 
     @PostMapping("/api/urls")
@@ -65,5 +69,19 @@ public class ShortUrlController {
                 shortUrl.getClickCount());
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/api/urls/{shortCode}/qr")
+    public ResponseEntity<byte[]> qr(@PathVariable String shortCode) {
+        ShortUrl shortUrl = shortUrlService.getStats(shortCode);
+
+        String shortUrlLink = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/{shortCode}")
+                .buildAndExpand(shortUrl.getShortCode())
+                .toUriString();
+
+        byte[] png = qrCodeService.generatePng(shortUrlLink);
+
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(png);
     }
 }

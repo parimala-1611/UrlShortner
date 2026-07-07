@@ -2,6 +2,7 @@ package com.urlshortener.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.urlshortener.model.ShortUrl;
+import com.urlshortener.service.QrCodeService;
 import com.urlshortener.service.ShortUrlService;
 import com.urlshortener.service.exception.ShortUrlExpiredException;
 import com.urlshortener.service.exception.ShortUrlNotFoundException;
@@ -34,6 +35,9 @@ class ShortUrlControllerTest {
 
     @MockBean
     private ShortUrlService shortUrlService;
+
+    @MockBean
+    private QrCodeService qrCodeService;
 
     @Test
     void shortenReturnsCreatedWithShortenedUrlDetails() throws Exception {
@@ -134,6 +138,39 @@ class ShortUrlControllerTest {
 
         mockMvc.perform(get("/api/urls/missing"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void qrReturnsPngImageForExistingCode() throws Exception {
+        ShortUrl shortUrl = new ShortUrl("https://example.com/page", "abc12345", null);
+        byte[] fakePng = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
+        when(shortUrlService.getStats("abc12345")).thenReturn(shortUrl);
+        when(qrCodeService.generatePng(org.mockito.ArgumentMatchers.anyString())).thenReturn(fakePng);
+
+        mockMvc.perform(get("/api/urls/abc12345/qr"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "image/png"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(fakePng));
+    }
+
+    @Test
+    void qrReturnsNotFoundForUnknownCode() throws Exception {
+        when(shortUrlService.getStats("missing")).thenThrow(new ShortUrlNotFoundException("missing"));
+
+        mockMvc.perform(get("/api/urls/missing/qr"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void qrWorksForExpiredCode() throws Exception {
+        ShortUrl shortUrl = new ShortUrl("https://example.com/page", "expired1",
+                OffsetDateTime.now().minusDays(1));
+        byte[] fakePng = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
+        when(shortUrlService.getStats("expired1")).thenReturn(shortUrl);
+        when(qrCodeService.generatePng(org.mockito.ArgumentMatchers.anyString())).thenReturn(fakePng);
+
+        mockMvc.perform(get("/api/urls/expired1/qr"))
+                .andExpect(status().isOk());
     }
 
     private record ShortenRequestJson(String url, OffsetDateTime expiresAt, String customAlias) {

@@ -15,6 +15,7 @@ for the formal API contract.
 | Expiry | A short URL expires at a given timestamp. If you don't supply one, a default expiry is applied (see Data retention below) — links are not kept forever by default. After expiry, redirects return `410 Gone` instead of redirecting. |
 | Click count | Every successful redirect increments a counter, visible via the stats endpoint. |
 | Stats lookup | `/api/urls/{shortCode}` returns metadata (original URL, timestamps, click count) without triggering a redirect or click increment. |
+| QR code | `/api/urls/{shortCode}/qr` returns a PNG QR code encoding the short link. Works for expired codes too (encoding the link isn't the same as redirecting through it), and doesn't increment the click count. |
 | Strict URL validation | Only real `http`/`https` URLs are accepted — see Validation rules below. |
 
 ## How shortening works
@@ -68,6 +69,7 @@ every conceivable fake domain, but it blocks the concrete cases above.
 | `POST` | `/api/urls` | Create/dedupe a short URL | `201 Created` | `400` invalid URL/validation |
 | `GET` | `/{shortCode}` | Redirect + increment clicks | `302 Found` (`Location` header) | `404` unknown code, `410` expired |
 | `GET` | `/api/urls/{shortCode}` | Read stats, no side effects | `200 OK` | `404` unknown code |
+| `GET` | `/api/urls/{shortCode}/qr` | PNG QR code for the short link | `200 OK` (`image/png`) | `404` unknown code |
 
 All error responses share one shape: `{ "error": "<message>" }`.
 
