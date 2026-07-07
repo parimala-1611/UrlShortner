@@ -23,4 +23,6 @@ built for the "Agentic Software Engineering System" assignment.
 - [`docs/schemas.md`](./docs/schemas.md) — database and JSON schemas.
 - [`docs/FRONTEND_INTEGRATION.md`](./docs/FRONTEND_INTEGRATION.md) — building a
   frontend against this API.
+- [`docs/apiflow.md`](./docs/apiflow.md) — call-by-call flows (sequence diagrams) for
+  implementing a frontend: create, redirect, stats/QR/analytics, error handling.
 - [`openapi.yml`](./openapi.yml) — formal API contract.
