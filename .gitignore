@@ -6,3 +6,9 @@ target/
 .vscode/
 
 .env
+
+# Orchestrator run output - generated audit logs/state, not source
+orchestrator/runs/
+orchestrator/artifacts/
+__pycache__/
+*.pyc
